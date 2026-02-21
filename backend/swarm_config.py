@@ -64,7 +64,7 @@ def get_llm():
     elif provider == "xai":
         from langchain_xai import ChatXAI
         return ChatXAI(
-            model=os.getenv("XAI_MODEL", "grok-3"),
+            model=os.getenv("XAI_MODEL", "grok-4.2"),
             api_key=os.getenv("XAI_API_KEY"),
             temperature=0.7,
         )
