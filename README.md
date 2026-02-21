@@ -210,6 +210,3 @@ Contributions welcome! Please read our [Contributing Guide](CONTRIBUTING.md) fir
 
 EvoSwarm is experimental software. The self-evolution feature requires significant computational resources and should be monitored. Always review generated code before production use.
 
----
-
-Built with ❤️ using LangGraph, FastAPI, Next.js, and Neo4j
