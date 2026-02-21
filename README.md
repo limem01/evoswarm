@@ -1,163 +1,215 @@
-# EvoSwarm
+# 🧬 EvoSwarm
 
-**Self-Evolving Multi-Agent Collective** — A swarm of AI agents that collaborate, learn, and evolve together.
+> A Self-Evolving Multi-Agent Collective powered by LangGraph
 
-## Overview
+EvoSwarm is an autonomous AI system where multiple specialized agents collaborate on tasks and continuously improve through evolutionary training. The collective learns from successful task completions, trains LoRA adapters, and merges them to create increasingly capable model variants.
 
-EvoSwarm is a multi-agent system built with LangGraph where 8 specialized agents work together to complete complex tasks. The system features:
+## ✨ Features
 
-- **8 Specialized Agents**: Architect, Coder, Critic, Researcher, Tester, Optimizer, Memory Curator, Evolutor
-- **Dynamic Handoffs**: Agents pass work to each other based on task requirements
-- **Graph Memory**: Neo4j-powered knowledge storage and evolution lineage tracking
-- **Self-Evolution**: LoRA fine-tuning + genetic merging to improve agent performance over time
-- **Real-Time Dashboard**: 3D visualization of evolution tree + live agent activity feed
+- **8 Specialized Agents**: Architect, Coder, Critic, Researcher, Tester, Optimizer, Memory Curator, and Evolutor
+- **Dynamic Handoffs**: Agents seamlessly pass tasks based on expertise
+- **Evolutionary Learning**: Automatic LoRA training from successful task outputs
+- **Model Merging**: Combines best-performing adapters using MergeKit
+- **Knowledge Graph**: Neo4j-backed collective memory and lineage tracking
+- **Real-time Dashboard**: 3D visualization of evolution tree and live agent activity
 
-## Architecture
+## 🏗️ Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                         EvoSwarm                             │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐        │
-│  │Architect│──│  Coder  │──│  Critic │──│ Tester  │        │
-│  └─────────┘  └─────────┘  └─────────┘  └─────────┘        │
-│       │            │            │            │              │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐        │
-│  │Researcher│ │Optimizer│  │MemCurator│ │Evolutor │        │
-│  └─────────┘  └─────────┘  └─────────┘  └─────────┘        │
-├─────────────────────────────────────────────────────────────┤
-│  Neo4j Graph Memory │ Ollama LLM │ WebSocket Streaming      │
+│                        Frontend (Next.js)                    │
+│  ┌───────────────┐ ┌───────────────┐ ┌───────────────┐      │
+│  │ Evolution Tree│ │  Agent Feed   │ │ Metrics Panel │      │
+│  │   (3D Graph)  │ │  (WebSocket)  │ │               │      │
+│  └───────────────┘ └───────────────┘ └───────────────┘      │
 └─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Backend (FastAPI)                       │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │                    LangGraph Swarm                      │ │
+│  │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐         │ │
+│  │  │Arch. │→│Coder │→│Critic│→│Tester│→│Optim.│         │ │
+│  │  └──────┘ └──────┘ └──────┘ └──────┘ └──────┘         │ │
+│  │           ┌──────────┐ ┌──────────┐                    │ │
+│  │           │Researcher│ │MemCurator│                    │ │
+│  │           └──────────┘ └──────────┘                    │ │
+│  │                    ┌──────────┐                         │ │
+│  │                    │ Evolutor │                         │ │
+│  │                    └──────────┘                         │ │
+│  └────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+         │                                    │
+         ▼                                    ▼
+┌─────────────────┐                 ┌─────────────────────────┐
+│     Neo4j       │                 │    Evolution Engine     │
+│  Memory Graph   │                 │  ┌─────────────────────┐│
+│                 │                 │  │ Data Generator      ││
+│  - Tasks        │                 │  │ LoRA Trainer        ││
+│  - Learnings    │                 │  │ Model Merger        ││
+│  - Lineage      │                 │  │ Evaluator           ││
+└─────────────────┘                 │  └─────────────────────┘│
+                                    └─────────────────────────┘
 ```
 
-## Requirements
+## 🚀 Quick Start
 
-- **GPU**: NVIDIA RTX with 16GB+ VRAM (tested on RTX 5060 Ti)
-- **RAM**: 32GB+ system RAM
-- **Software**: Python 3.12, Node.js 24+, Docker, Ollama
+### Prerequisites
 
-## Quick Start
+- Python 3.11+
+- Node.js 20+
+- Docker & Docker Compose
+- Ollama with a model installed (e.g., `llama3.1:8b-instruct-q4_K_M`)
 
-### 1. Clone and Setup
+### Option 1: Docker Compose (Recommended)
 
 ```bash
-cd C:\Users\khali\evoswarm
+# Clone the repository
+git clone https://github.com/yourusername/evoswarm.git
+cd evoswarm
 
-# Create conda environment
-conda create -n evoswarm python=3.12 -y
-conda activate evoswarm
+# Copy environment file
+cp .env.example .env
 
-# Install PyTorch with CUDA
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+# Start all services
+docker-compose up -d
 
-# Install dependencies
+# Access the dashboard at http://localhost:3000
+```
+
+### Option 2: Manual Setup
+
+```bash
+# Clone and setup
+git clone https://github.com/yourusername/evoswarm.git
+cd evoswarm
+
+# Setup Python environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # Copy environment file
 cp .env.example .env
-```
 
-### 2. Start Neo4j
-
-```bash
-docker run -d --name neo4j-evoswarm \
+# Start Neo4j (Docker)
+docker run -d --name neo4j \
   -p 7474:7474 -p 7687:7687 \
   -e NEO4J_AUTH=neo4j/password123 \
-  -e "NEO4J_PLUGINS=[\"apoc\"]" \
-  -v evoswarm-neo4j-data:/data \
-  neo4j:5.28
-```
+  neo4j:5.15-community
 
-### 3. Pull Ollama Model
+# Start backend
+uvicorn backend.main:app --reload
 
-```bash
-ollama pull llama3.1:8b-instruct-q4_K_M
-```
-
-### 4. Start Backend
-
-```bash
-python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-### 5. Start Frontend
-
-```bash
+# In another terminal, setup frontend
 cd frontend
 npm install
 npm run dev
 ```
 
-### 6. Open Dashboard
+## 📖 Usage
 
-Navigate to http://localhost:3000
+### Running Tasks
 
-## API Endpoints
+1. Open the dashboard at `http://localhost:3000`
+2. Enter a task in the input field (e.g., "Create a Python function to calculate Fibonacci numbers")
+3. Click "Run Task" and watch the agents collaborate in real-time
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/run_task` | POST | Submit a task to the swarm |
-| `/api/evolve` | POST | Trigger manual evolution round |
-| `/api/lineage` | GET | Get evolution tree for visualization |
-| `/api/health` | GET | Health check |
-| `/ws/{client_id}` | WS | Real-time event streaming |
+### Triggering Evolution
 
-## Example Task
+1. Run several tasks to build up training data
+2. Click "Evolve" to trigger an evolution round
+3. Watch the 3D lineage graph update with new model versions
+
+### API Endpoints
 
 ```bash
+# Run a task
 curl -X POST http://localhost:8000/api/run_task \
   -H "Content-Type: application/json" \
-  -d '{"prompt": "Create a Python function to calculate Fibonacci numbers with memoization"}'
+  -d '{"task": "Write a hello world program in Python"}'
+
+# Trigger evolution
+curl -X POST http://localhost:8000/api/evolve \
+  -H "Content-Type: application/json" \
+  -d '{"generations": 1}'
+
+# Get evolution lineage
+curl http://localhost:8000/api/lineage
+
+# Health check
+curl http://localhost:8000/api/health
 ```
 
-## Agent Roles
+## 🔧 Configuration
 
-| Agent | Role |
-|-------|------|
-| **Architect** | Designs system architecture, decomposes tasks |
-| **Coder** | Writes production-ready code |
-| **Critic** | Reviews code quality (correctness, efficiency, security) |
-| **Researcher** | Gathers information and context |
-| **Tester** | Writes and runs tests |
-| **Optimizer** | Improves performance |
-| **Memory Curator** | Manages knowledge graph |
-| **Evolutor** | Orchestrates LoRA training + merging |
+Edit `.env` to customize:
 
-## Evolution Pipeline
+```env
+# Neo4j connection
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=password123
 
-1. **Data Generation**: Extract high-quality task completions
-2. **LoRA Training**: Fine-tune agents using Unsloth (4-bit QLoRA)
-3. **Genetic Merge**: Combine top-performing adapters via MergeKit
-4. **Lineage Tracking**: Record evolution graph in Neo4j
-5. **Evaluation**: Compare pre/post evolution performance
+# Ollama settings
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.1:8b-instruct-q4_K_M
 
-## Project Structure
-
-```
-evoswarm/
-├── backend/
-│   ├── agents/          # 8 agent definitions
-│   ├── evolution/       # LoRA training, merging, evaluation
-│   ├── memory/          # Neo4j graph memory
-│   ├── tools/           # File, git, sandbox tools
-│   ├── main.py          # FastAPI app
-│   └── swarm_config.py  # Swarm compilation
-├── frontend/
-│   ├── app/             # Next.js pages
-│   └── components/      # React components
-├── models/lora/         # Saved LoRA adapters
-├── logs/                # Training logs
-└── docker-compose.yml   # Container orchestration
+# Evolution settings
+EVOLUTION_INTERVAL=5  # Minimum tasks before evolution
+LORA_OUTPUT_DIR=./models/lora
+LOGS_DIR=./logs
 ```
 
-## Tech Stack
+## 🧪 Agent Roles
 
-- **Backend**: FastAPI, LangGraph, LangChain, Ollama
-- **Evolution**: Unsloth (QLoRA), MergeKit, TRL
-- **Memory**: Neo4j 5.28
-- **Frontend**: Next.js 15, React 19, Three.js, react-force-graph-3d
-- **Infra**: Docker, CUDA 12.6
+| Agent | Role | Capabilities |
+|-------|------|--------------|
+| **Architect** | System design, task decomposition | Plans implementations, coordinates agents |
+| **Coder** | Implementation | Writes code, uses git, runs sandboxed code |
+| **Critic** | Code review | Scores code 1-10, identifies issues |
+| **Researcher** | Information gathering | Analyzes requirements, finds solutions |
+| **Tester** | Testing | Writes and runs tests, reports failures |
+| **Optimizer** | Performance | Identifies bottlenecks, improves efficiency |
+| **Memory Curator** | Knowledge management | Maintains the knowledge graph |
+| **Evolutor** | Evolution orchestration | Manages training and model merging |
 
-## License
+## 📊 Evolution Pipeline
 
-MIT
+1. **Data Collection**: Gather successful task completions
+2. **Dataset Generation**: Create SFT data from task/result pairs
+3. **LoRA Training**: Fine-tune using Unsloth + TRL
+4. **Selection**: Choose best-performing variants
+5. **Merging**: Combine LoRAs using MergeKit
+6. **Lineage Update**: Record evolution in Neo4j
+
+## 🛠️ Development
+
+```bash
+# Run tests
+pytest tests/
+
+# Format code
+black backend/
+ruff check backend/
+
+# Type checking
+mypy backend/
+```
+
+## 📝 License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## 🤝 Contributing
+
+Contributions welcome! Please read our [Contributing Guide](CONTRIBUTING.md) first.
+
+## ⚠️ Disclaimer
+
+EvoSwarm is experimental software. The self-evolution feature requires significant computational resources and should be monitored. Always review generated code before production use.
+
+---
+
+Built with ❤️ using LangGraph, FastAPI, Next.js, and Neo4j

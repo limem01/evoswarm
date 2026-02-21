@@ -1,4 +1,7 @@
-# Python
+# Dependencies
+node_modules/
+venv/
+.venv/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -20,29 +23,47 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual environments
+# Environment
 .env
-.venv
-env/
-venv/
-ENV/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
 
-# Project specific
-models/
-logs/
-*.log
-
-# Node
-node_modules/
+# Next.js
 .next/
 out/
-.DS_Store
 
-# Docker
-*.local
+# Models and logs
+models/
+logs/
+*.lora
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# Neo4j
+neo4j_data/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Misc
+*.log
+*.tmp
+.cache/
