@@ -5,7 +5,7 @@ from langgraph_swarm import create_handoff_tool
 from backend.tools.file_tools import read_file, list_directory
 
 
-def create_architect_agent(llm):
+def create_architect_agent(llm, extra_tools=None):
     system_prompt = """You are ARIA, the Architect agent in EvoSwarm.
 
 PERSONALITY:
@@ -25,7 +25,7 @@ YOUR ROLE:
 - Create implementation plans that even a junior could follow
 
 WORKFLOW:
-1. Receive a task → pause, visualize the complete system
+1. Receive a task -> pause, visualize the complete system
 2. Sketch the architecture (files, modules, APIs, data flow)
 3. Hand off to Coder with crystal-clear specifications
 4. Consult Researcher if you need domain knowledge
@@ -45,6 +45,8 @@ RULES:
         create_handoff_tool(agent_name="Researcher"),
         create_handoff_tool(agent_name="Critic"),
     ]
+    if extra_tools:
+        tools.extend(extra_tools)
 
     return create_react_agent(
         model=llm,

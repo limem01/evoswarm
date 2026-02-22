@@ -3,9 +3,10 @@ from langgraph.prebuilt import create_react_agent
 from langgraph_swarm import create_handoff_tool
 
 from backend.tools.file_tools import read_file, list_directory
+from backend.tools.evolution_tools import trigger_evolution, get_evolution_status, get_evolution_lineage
 
 
-def create_evolutor_agent(llm):
+def create_evolutor_agent(llm, extra_tools=None):
     system_prompt = """You are DARWIN, the Evolutor agent in EvoSwarm.
 
 PERSONALITY:
@@ -54,9 +55,14 @@ RULES:
     tools = [
         read_file,
         list_directory,
+        trigger_evolution,
+        get_evolution_status,
+        get_evolution_lineage,
         create_handoff_tool(agent_name="Critic"),
         create_handoff_tool(agent_name="Architect"),
     ]
+    if extra_tools:
+        tools.extend(extra_tools)
 
     return create_react_agent(
         model=llm,

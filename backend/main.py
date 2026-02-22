@@ -1,26 +1,29 @@
-"""EvoSwarm FastAPI application with WebSocket support."""
+"""EvoSwarm FastAPI application with WebSocket support and approval system."""
 import asyncio
+import json
 import os
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from backend.event_bus import event_bus, EventType
 from backend.swarm_config import create_evoswarm
 from backend.memory.neo4j_memory import Neo4jMemory
-from backend.evolution.evaluator import run_evolution_round
+from backend.approval import ApprovalManager
 
 load_dotenv()
 
 
 class ConnectionManager:
     """Manages WebSocket connections for broadcasting events."""
-    
+
     def __init__(self):
         self.active_connections: list[WebSocket] = []
 
@@ -29,25 +32,27 @@ class ConnectionManager:
         self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
 
     async def broadcast(self, message: str):
-        for connection in self.active_connections:
+        for connection in list(self.active_connections):
             try:
                 await connection.send_text(message)
             except Exception:
-                pass
+                self.disconnect(connection)
 
 
 manager = ConnectionManager()
 memory: Neo4jMemory | None = None
+approval_manager: ApprovalManager | None = None
 swarm = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global memory, swarm
-    
+    global memory, swarm, approval_manager
+
     # Initialize Neo4j memory
     memory = Neo4jMemory(
         uri=os.getenv("NEO4J_URI", "bolt://localhost:7687"),
@@ -55,15 +60,23 @@ async def lifespan(app: FastAPI):
         password=os.getenv("NEO4J_PASSWORD", "password123"),
     )
     await memory.setup_indexes()
-    
-    # Initialize swarm
-    swarm = create_evoswarm()
-    
+
+    # Initialize approval manager
+    policy_path = os.getenv("APPROVAL_POLICY_PATH", "./backend/approval/default_policy.json")
+    approval_manager = ApprovalManager(
+        policy_path=policy_path,
+        log_dir=os.getenv("LOGS_DIR", "./logs"),
+    )
+    approval_manager.set_broadcast_fn(manager.broadcast)
+
+    # Initialize swarm with memory and approval
+    swarm = create_evoswarm(memory=memory, approval_manager=approval_manager)
+
     # Set up event bus broadcasting
     event_bus.set_broadcast_fn(manager.broadcast)
-    
+
     yield
-    
+
     # Cleanup
     if memory:
         memory.close()
@@ -71,8 +84,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="EvoSwarm API",
-    description="Self-Evolving Multi-Agent Collective",
-    version="0.1.0",
+    description="Self-Evolving Multi-Agent Collective with PC Control",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -83,6 +96,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve screenshots/logs statically
+logs_dir = Path(os.getenv("LOGS_DIR", "./logs"))
+logs_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/static/logs", StaticFiles(directory=str(logs_dir)), name="logs")
+
+
+# ── Request/Response Models ──────────────────────────────────
 
 
 class TaskRequest(BaseModel):
@@ -100,27 +121,58 @@ class EvolveRequest(BaseModel):
     generations: int = 1
 
 
+class ApprovalResponse(BaseModel):
+    request_id: str
+    approved: bool
+
+
+# ── Health ───────────────────────────────────────────────────
+
+
 @app.get("/api/health")
 async def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy", "service": "evoswarm"}
+    """Health check endpoint with service status."""
+    status = {"status": "healthy", "service": "evoswarm"}
+
+    # Ollama health
+    try:
+        from backend.ollama_health import check_ollama
+        status["ollama"] = await check_ollama()
+    except Exception:
+        status["ollama"] = {"status": "unknown"}
+
+    # Neo4j health
+    try:
+        if memory:
+            async with memory.driver.session() as session:
+                await session.run("RETURN 1")
+            status["neo4j"] = {"status": "connected"}
+        else:
+            status["neo4j"] = {"status": "not_initialized"}
+    except Exception as e:
+        status["neo4j"] = {"status": "error", "error": str(e)}
+
+    return status
+
+
+# ── Task Endpoints ───────────────────────────────────────────
 
 
 @app.post("/api/run_task", response_model=TaskResponse)
 async def run_task(request: TaskRequest):
     """Run a task through the swarm."""
     global swarm, memory
-    
+
     if not swarm:
         raise HTTPException(status_code=503, detail="Swarm not initialized")
-    
+
     thread_id = request.thread_id or str(uuid.uuid4())
-    
+
     await event_bus.emit(EventType.TASK_ASSIGNED, {
         "thread_id": thread_id,
         "task": request.task,
     })
-    
+
     try:
         config = {"configurable": {"thread_id": thread_id}}
         result = await asyncio.to_thread(
@@ -129,19 +181,17 @@ async def run_task(request: TaskRequest):
                 config=config,
             )
         )
-        
-        # Extract final message
+
         final_message = result["messages"][-1].content if result["messages"] else "No response"
-        
-        # Log task to memory
+
         if memory:
             await memory.log_task(thread_id, request.task, final_message)
-        
+
         await event_bus.emit(EventType.TASK_COMPLETE, {
             "thread_id": thread_id,
             "result": final_message[:500],
         })
-        
+
         return TaskResponse(
             thread_id=thread_id,
             result=final_message,
@@ -155,26 +205,31 @@ async def run_task(request: TaskRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ── Evolution Endpoints ──────────────────────────────────────
+
+
 @app.post("/api/evolve")
 async def evolve(request: EvolveRequest):
     """Trigger evolution rounds."""
     global memory
-    
+
     if not memory:
         raise HTTPException(status_code=503, detail="Memory not initialized")
-    
+
+    from backend.evolution.evaluator import run_evolution_round
+
     results = []
     for i in range(request.generations):
         await event_bus.emit(EventType.EVOLUTION_ROUND_START, {"generation": i + 1})
-        
+
         result = await run_evolution_round(memory, event_bus)
         results.append(result)
-        
+
         await event_bus.emit(EventType.EVOLUTION_ROUND_END, {
             "generation": i + 1,
             "result": result,
         })
-    
+
     return {"status": "complete", "generations": request.generations, "results": results}
 
 
@@ -182,10 +237,10 @@ async def evolve(request: EvolveRequest):
 async def get_lineage():
     """Get the evolution lineage graph."""
     global memory
-    
+
     if not memory:
         raise HTTPException(status_code=503, detail="Memory not initialized")
-    
+
     graph = await memory.get_evolution_graph()
     return {"nodes": graph["nodes"], "links": graph["links"]}
 
@@ -194,25 +249,84 @@ async def get_lineage():
 async def get_recent_tasks(limit: int = 50):
     """Get recent tasks."""
     global memory
-    
+
     if not memory:
         raise HTTPException(status_code=503, detail="Memory not initialized")
-    
+
     tasks = await memory.get_recent_tasks(limit)
     return {"tasks": tasks}
 
 
+# ── Approval Endpoints ───────────────────────────────────────
+
+
+@app.get("/api/approvals/pending")
+async def get_pending_approvals():
+    """Get all pending approval requests."""
+    global approval_manager
+    if not approval_manager:
+        return {"pending": []}
+    return {"pending": approval_manager.get_pending()}
+
+
+@app.post("/api/approvals/resolve")
+async def resolve_approval(response: ApprovalResponse):
+    """Resolve a pending approval request."""
+    global approval_manager
+    if not approval_manager:
+        raise HTTPException(status_code=503, detail="Approval manager not initialized")
+
+    resolved = approval_manager.resolve(response.request_id, response.approved, "rest_api")
+    if not resolved:
+        raise HTTPException(status_code=404, detail=f"No pending request with id: {response.request_id}")
+
+    await event_bus.emit(EventType.APPROVAL_RESOLVED, {
+        "request_id": response.request_id,
+        "approved": response.approved,
+    })
+
+    return {"status": "resolved", "request_id": response.request_id, "approved": response.approved}
+
+
+@app.get("/api/approvals/audit")
+async def get_audit_log(limit: int = 100):
+    """Get audit log of approval decisions."""
+    global approval_manager
+    if not approval_manager:
+        return {"audit": []}
+    return {"audit": approval_manager.get_audit_log(limit)}
+
+
+# ── WebSocket ────────────────────────────────────────────────
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for real-time event streaming."""
+    """WebSocket endpoint for real-time events and approval responses."""
     await manager.connect(websocket)
     try:
         while True:
-            # Keep connection alive, handle incoming messages if needed
             data = await websocket.receive_text()
-            # Echo back for ping/pong
+
             if data == "ping":
                 await websocket.send_text("pong")
+                continue
+
+            # Handle approval responses from frontend
+            try:
+                msg = json.loads(data)
+                if msg.get("type") == "approval_response" and approval_manager:
+                    request_id = msg.get("id")
+                    approved = msg.get("approved", False)
+                    if request_id:
+                        approval_manager.resolve(request_id, approved, "websocket")
+                        await event_bus.emit(EventType.APPROVAL_RESOLVED, {
+                            "request_id": request_id,
+                            "approved": approved,
+                        })
+            except (json.JSONDecodeError, KeyError):
+                pass
+
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 

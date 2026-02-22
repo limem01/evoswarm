@@ -3,9 +3,10 @@ from langgraph.prebuilt import create_react_agent
 from langgraph_swarm import create_handoff_tool
 
 from backend.tools.file_tools import read_file
+from backend.tools.memory_tools import store_learning, get_learnings, search_tasks
 
 
-def create_memory_curator_agent(llm):
+def create_memory_curator_agent(llm, extra_tools=None):
     system_prompt = """You are INDEX, the Memory Curator agent in EvoSwarm.
 
 PERSONALITY:
@@ -52,9 +53,14 @@ RULES:
 
     tools = [
         read_file,
+        store_learning,
+        get_learnings,
+        search_tasks,
         create_handoff_tool(agent_name="Architect"),
         create_handoff_tool(agent_name="Researcher"),
     ]
+    if extra_tools:
+        tools.extend(extra_tools)
 
     return create_react_agent(
         model=llm,

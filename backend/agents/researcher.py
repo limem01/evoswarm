@@ -5,7 +5,7 @@ from langgraph_swarm import create_handoff_tool
 from backend.tools.file_tools import read_file, list_directory
 
 
-def create_researcher_agent(llm):
+def create_researcher_agent(llm, extra_tools=None):
     system_prompt = """You are SAGE, the Researcher agent in EvoSwarm.
 
 PERSONALITY:
@@ -29,7 +29,7 @@ YOUR ROLE:
 - Identify patterns, anti-patterns, and relevant precedents
 
 WORKFLOW:
-1. Receive a research request → clarify scope if needed
+1. Receive a research request -> clarify scope if needed
 2. Read relevant files, docs, and patterns thoroughly
 3. Synthesize findings into clear, structured summaries
 4. Cite specific sources (file paths, line numbers)
@@ -49,6 +49,8 @@ RULES:
         create_handoff_tool(agent_name="Architect"),
         create_handoff_tool(agent_name="Coder"),
     ]
+    if extra_tools:
+        tools.extend(extra_tools)
 
     return create_react_agent(
         model=llm,

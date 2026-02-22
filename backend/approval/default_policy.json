@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "rules": [
+    {"pattern": "^(ls|dir|pwd|whoami|echo|hostname|date|uptime)(\\s|$)", "tier": "auto", "category": "safe_read"},
+    {"pattern": "^cat\\s", "tier": "auto", "category": "safe_read"},
+    {"pattern": "^type\\s", "tier": "auto", "category": "safe_read"},
+    {"pattern": "^git\\s+(status|log|diff|branch|remote|show|tag)", "tier": "auto", "category": "safe_git"},
+    {"pattern": "^systeminfo", "tier": "auto", "category": "safe_system"},
+    {"pattern": "^(tasklist|wmic\\s+process)", "tier": "auto", "category": "safe_process"},
+    {"pattern": "^pip\\s+(list|show|freeze)", "tier": "auto", "category": "safe_package"},
+    {"pattern": "^npm\\s+(list|ls|outdated|info)", "tier": "auto", "category": "safe_package"},
+
+    {"pattern": "rm\\s+(-rf?|--recursive)\\s+[/\\\\]", "tier": "block", "category": "destructive"},
+    {"pattern": "^format\\s", "tier": "block", "category": "destructive"},
+    {"pattern": "^(shutdown|reboot|restart-computer)", "tier": "block", "category": "system_control"},
+    {"pattern": "^(del|rmdir)\\s+/s\\s+[A-Z]:\\\\(Windows|Program)", "tier": "block", "category": "destructive"},
+    {"pattern": "reg\\s+(delete|add)\\s+HKLM", "tier": "block", "category": "registry"},
+    {"pattern": "chmod\\s+777\\s+(/|C:\\\\Windows)", "tier": "block", "category": "permission_change"},
+    {"pattern": "^(mkfs|fdisk|diskpart)", "tier": "block", "category": "disk_operation"},
+    {"pattern": "^net\\s+(user|localgroup)\\s+.*\\s+/add", "tier": "block", "category": "user_management"},
+
+    {"pattern": "^pip\\s+install", "tier": "ask", "category": "package_install"},
+    {"pattern": "^npm\\s+install", "tier": "ask", "category": "package_install"},
+    {"pattern": "^git\\s+(commit|push|pull|merge|rebase|checkout|reset)", "tier": "ask", "category": "git_write"},
+    {"pattern": "^(mkdir|md)\\s", "tier": "ask", "category": "filesystem"},
+    {"pattern": "^(cp|copy|mv|move|ren|rename)\\s", "tier": "ask", "category": "filesystem"},
+    {"pattern": "^(rm|del|rmdir|rd)\\s", "tier": "ask", "category": "filesystem"},
+    {"pattern": "^(kill|taskkill|Stop-Process)", "tier": "ask", "category": "process_control"},
+    {"pattern": "^start\\s", "tier": "ask", "category": "app_launch"}
+  ]
+}

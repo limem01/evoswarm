@@ -10,6 +10,7 @@ from typing import Any, Callable, Coroutine
 class EventType(str, Enum):
     AGENT_STARTED = "agent_started"
     AGENT_MESSAGE = "agent_message"
+    AGENT_STATUS = "agent_status"
     HANDOFF = "handoff"
     TASK_ASSIGNED = "task_assigned"
     TASK_COMPLETE = "task_complete"
@@ -20,6 +21,11 @@ class EventType(str, Enum):
     MERGE_COMPLETE = "merge_complete"
     LINEAGE_UPDATE = "lineage_update"
     ERROR = "error"
+    # New event types for PC control
+    APPROVAL_REQUIRED = "approval_required"
+    APPROVAL_RESOLVED = "approval_resolved"
+    COMMAND_OUTPUT = "command_output"
+    SCREENSHOT_CAPTURED = "screenshot_captured"
 
 
 class EventBus:
@@ -37,3 +43,7 @@ class EventBus:
         }
         if self._broadcast_fn:
             await self._broadcast_fn(json.dumps(event))
+
+
+# Global singleton instance
+event_bus = EventBus()

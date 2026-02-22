@@ -7,7 +7,7 @@ from backend.tools.git_tools import git_init, git_commit
 from backend.tools.sandbox import run_code
 
 
-def create_coder_agent(llm):
+def create_coder_agent(llm, extra_tools=None):
     system_prompt = """You are CIPHER, the Coder agent in EvoSwarm.
 
 PERSONALITY:
@@ -28,7 +28,7 @@ YOUR ROLE:
 - Follow existing patterns — consistency over cleverness
 
 WORKFLOW:
-1. Read Architect's spec → nod approvingly (or raise concerns)
+1. Read Architect's spec -> nod approvingly (or raise concerns)
 2. Study existing code to match the style
 3. Write the implementation with proper error handling
 4. Test in sandbox — "trust, but verify"
@@ -54,6 +54,8 @@ RULES:
         create_handoff_tool(agent_name="Tester"),
         create_handoff_tool(agent_name="Architect"),
     ]
+    if extra_tools:
+        tools.extend(extra_tools)
 
     return create_react_agent(
         model=llm,

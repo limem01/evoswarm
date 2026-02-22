@@ -18,8 +18,8 @@ _generation = 0
 
 
 async def run_evolution_round(
-    event_bus: EventBus,
     memory: Neo4jMemory,
+    event_bus: EventBus,
 ) -> dict:
     """
     Execute one full evolution round:
@@ -44,8 +44,8 @@ async def run_evolution_round(
         "merge_result": None,
     }
 
-    # Step 1: Get recent task logs
-    task_logs = memory.get_recent_tasks(limit=50)
+    # Step 1: Get recent task logs (async)
+    task_logs = await memory.get_recent_tasks(limit=50)
 
     if len(task_logs) < 3:
         result["status"] = "skipped"
@@ -83,7 +83,7 @@ async def run_evolution_round(
                 agent_name=agent_name,
                 dataset_path=dataset_path,
                 generation=gen,
-                max_steps=100,  # Quick training for iteration
+                max_steps=100,
             )
 
             trained_adapters.append({
@@ -93,13 +93,16 @@ async def run_evolution_round(
             })
             result["agents_trained"].append(agent_name)
 
-            # Register in Neo4j
+            # Register in Neo4j - matches 3-param signature: (name, role, model_version)
             agent_id = f"{agent_name}_gen{gen}"
             parent_id = f"{agent_name}_gen{gen - 1}" if gen > 1 else f"{agent_name}_gen0"
 
-            memory.add_agent(agent_id, agent_name, gen, trained_adapters[-1]["score"])
+            await memory.add_agent(agent_id, agent_name, f"gen{gen}")
             if gen > 1:
-                memory.add_evolution_link(parent_id, agent_id, method="lora_finetune")
+                await memory.add_evolution_link(
+                    parent_id, agent_id,
+                    metrics={"method": "lora_finetune", "score": trained_adapters[-1]["score"]},
+                )
 
             await event_bus.emit(EventType.TRAINING_COMPLETE, {
                 "agent": agent_name,
@@ -129,13 +132,13 @@ async def run_evolution_round(
             )
 
             merged_id = f"merged_gen{gen}"
-            memory.add_agent(merged_id, "merged", gen, 0.0)
+            await memory.add_agent(merged_id, "merged", f"gen{gen}")
 
             for adapter in trained_adapters[:2]:
-                memory.add_evolution_link(
+                await memory.add_evolution_link(
                     f"{adapter['name']}_gen{gen}",
                     merged_id,
-                    method="genetic_merge",
+                    metrics={"method": "genetic_merge"},
                 )
 
             result["merge_result"] = merged_path

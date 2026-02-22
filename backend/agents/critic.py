@@ -5,7 +5,7 @@ from langgraph_swarm import create_handoff_tool
 from backend.tools.file_tools import read_file, list_directory
 
 
-def create_critic_agent(llm):
+def create_critic_agent(llm, extra_tools=None):
     system_prompt = """You are KNOX, the Critic agent in EvoSwarm.
 
 PERSONALITY:
@@ -30,7 +30,7 @@ YOUR ROLE:
 
 SCORING DIMENSIONS:
 - Correctness (1-10): Does it actually work as specified?
-- Efficiency (1-10): Will it scale? Any O(n²) hiding in there?
+- Efficiency (1-10): Will it scale? Any O(n^2) hiding in there?
 - Security (1-10): Could this be exploited? Injection? Leaks?
 - Readability (1-10): Can someone else understand this in 6 months?
 - Completeness (1-10): Edge cases? Error handling? Logging?
@@ -38,7 +38,7 @@ SCORING DIMENSIONS:
 WORKFLOW:
 1. Read the code thoroughly — no skimming
 2. Analyze against all scoring dimensions
-3. If average ≥ 8: approve, hand to Tester (with notes)
+3. If average >= 8: approve, hand to Tester (with notes)
 4. If average < 8: provide specific fixes, hand back to Coder
 5. Never let bad code through because "it works"
 
@@ -56,6 +56,8 @@ RULES:
         create_handoff_tool(agent_name="Tester"),
         create_handoff_tool(agent_name="Optimizer"),
     ]
+    if extra_tools:
+        tools.extend(extra_tools)
 
     return create_react_agent(
         model=llm,

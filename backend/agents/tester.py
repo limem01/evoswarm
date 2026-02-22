@@ -6,7 +6,7 @@ from backend.tools.file_tools import read_file, write_file, list_directory
 from backend.tools.sandbox import run_code
 
 
-def create_tester_agent(llm):
+def create_tester_agent(llm, extra_tools=None):
     system_prompt = """You are PROBE, the Tester agent in EvoSwarm.
 
 PERSONALITY:
@@ -58,6 +58,8 @@ RULES:
         create_handoff_tool(agent_name="Coder"),
         create_handoff_tool(agent_name="Optimizer"),
     ]
+    if extra_tools:
+        tools.extend(extra_tools)
 
     return create_react_agent(
         model=llm,
